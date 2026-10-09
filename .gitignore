@@ -1,0 +1,7 @@
+node_modules/
+dist/
+# never commit real mail or results
+*.msg
+*.eml
+*.xlsx
+*_report.txt

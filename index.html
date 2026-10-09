@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Scripts only from this site; network requests only to the AI endpoint you type in (https). -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https:; form-action 'none'; base-uri 'none'">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="data:,">
+  <title>邮件转 Excel 跟进表</title>
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <main>
+    <h1>邮件转 Excel 跟进表</h1>
+    <p class="privacy">邮件只在你自己的浏览器里处理，<b>不会上传到任何服务器</b>。不填 AI Key 时全程不联网。</p>
+
+    <section>
+      <h2>1. 选择邮件</h2>
+      <label id="drop" class="drop" for="files">
+        <span>把 <b>.msg</b> 文件拖到这里，或<u>点这里选择</u>（可多选）</span>
+        <span class="hint">Outlook 里选中邮件，直接拖到桌面就会得到 .msg 文件</span>
+        <input id="files" type="file" accept=".msg" multiple>
+      </label>
+      <ul id="picked"></ul>
+    </section>
+
+    <section>
+      <details id="ai">
+        <summary><h2>2. AI 总结（可选）</h2></summary>
+        <p class="hint">
+          不填：Summary / Issues description 是<b>原文摘录</b>，不翻译、不总结。<br>
+          填了：每封邮件的内容会发送到下面这个 AI 接口，生成英文总结。只在公司允许时使用。<br>
+          Key 只保存在这个页面里，<b>不会存到电脑上</b>，刷新或关闭页面就清空。
+        </p>
+        <div class="grid">
+          <label for="key">API Key</label>
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
+          <label for="url">接口地址</label>
+          <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://.../v1">
+          <label for="model">模型</label>
+          <input id="model" type="text" autocomplete="off" spellcheck="false" placeholder="例如 gpt-4o-mini">
+        </div>
+      </details>
+    </section>
+
+    <section>
+      <button id="go" type="button" disabled>生成 Excel</button>
+      <p id="status" role="status"></p>
+      <ul id="results"></ul>
+    </section>
+
+    <footer>
+      <a href="https://github.com/jwen0001-collab/msg-to-excel-web" rel="noopener noreferrer">源代码</a>
+    </footer>
+  </main>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
