@@ -1,5 +1,6 @@
 // Real-browser check of the built site (run `npm run build` first). Never commit real .msg files.
 //   node tools/e2e.mjs <input.msg> <outdir> [chrome.exe]
+//   SITE_URL=https://.../ node tools/e2e.mjs ...   (test the deployed site instead of dist/)
 // Writes <outdir>/local.xlsx, <outdir>/llm.xlsx, <outdir>/blocked.xlsx and a screenshot.
 import fs from 'node:fs';
 import http from 'node:http';
@@ -16,7 +17,7 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(DIST) || !fs.existsSync(file)) { res.writeHead(404).end(); return; }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream' }).end(fs.readFileSync(file));
 }).listen(0);
-const base = `http://127.0.0.1:${server.address().port}/`;
+const base = process.env.SITE_URL || `http://127.0.0.1:${server.address().port}/`;
 
 const browser = await chromium.launch({ executablePath });
 const fail = msg => { console.log('FAIL', msg); process.exitCode = 1; };
