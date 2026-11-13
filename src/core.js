@@ -244,6 +244,23 @@ export function currentContent(segs) {
   return segs[0].text || (segs.slice(1).find(s => s.text) || { text: '' }).text;
 }
 
+/** Keep tracker cells brief even if a provider returns excessive detail. */
+export function compactIssue(text, sentences = 2) {
+  const oneLine = text.replace(/\s+/gu, ' ').trim();
+  const parts = oneLine.match(/.*?(?:[.!?](?=\s|$)|$)/gu).filter(s => s.trim());
+  return excerpt(parts.slice(0, sentences).join(' ').replace(/\s+/gu, ' ').trim(), 320, true);
+}
+
+/** Remove separate salutation/sign-off lines without rewriting the original text. */
+export function issueExcerpt(text) {
+  const lines = text.split('\n');
+  const greeting = /^(?:hi|hello|dear|bonjour|bonsoir|salut)(?:[ \t]+[\p{L}'’-]+){0,3}[,!:]?[ \t]*$/iu;
+  const closing = /^(?:thanks|thank you|regards|kind regards|best regards|sincerely|cordialement|bien cordialement|merci|bonne journée)[,!.]?[ \t]*$/iu;
+  while (lines.length && (!lines[0].trim() || greeting.test(lines[0].trim()))) lines.shift();
+  const end = lines.findIndex(line => closing.test(line.trim()));
+  return compactIssue((end < 0 ? lines : lines.slice(0, end)).join('\n'), 1);
+}
+
 export function localRow(mail, limits = {}) {
   const { summaryChars = SUMMARY_CHARS, issuesChars = ISSUES_CHARS } = limits;
   const segs = splitSegments(mail);
@@ -253,6 +270,7 @@ export function localRow(mail, limits = {}) {
   row.summary = excerpt(content, summaryChars, true);
   // quoted messages are context for the request (e.g. "FYI" on top of the real content)
   row.issues = excerpt(segs.filter(s => s.text).map(s => s.text).join('\n\n'), issuesChars, false);
+  if (limits.coreOnly) row.issues = issueExcerpt(content);
   row.requestor = FORWARD_RE.test(mail.subject) ? '' : mail.sender;
   row.followUpBy = followUpPeople(content);
   row.urgent = isUrgent(mail, content);

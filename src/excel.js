@@ -32,7 +32,7 @@ export async function writeExcel(rows, entryDate, report) {
         cell.numFmt = 'DD/MM/YYYY';
       } else if (v) {
         v = v.replace(ILLEGAL_CHARACTERS_RE, '');
-        const quoted = r.excerpts && (c === 2 || c === 3);
+        const quoted = (r.excerpts && (c === 2 || c === 3)) || (r.issueExcerpt && c === 3);
         const limit = EXCEL_CELL_MAX - (quoted ? 2 : 0);
         const cps = Array.from(v);
         if (cps.length > limit) {

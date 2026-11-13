@@ -222,7 +222,7 @@ const reply = obj => ({ choices: [{ message: { content: '```json\n' + JSON.strin
 
 const GOOD = {
   summary: 'Ops must fix TLM breaks on the NAV reconciliation.',
-  issues_description: 'Jean-Luc Bérard asks Ops to fix the TLM breaks; a reminder was sent.',
+  issues_description: 'Please fix the TLM breaks on the NAV recon.',
   requestor: { name: 'Jean-Luc Bérard', evidence: 'From: Jean-Luc Bérard' },
   follow_up_by: [{ name: 'Ghost Person', evidence: 'Ghost Person will follow up' }],
   urgent: { value: true, evidence: 'This is urgent.' },
@@ -246,7 +246,7 @@ test('llm: success and evidence grounding', async () => {
   const { ws, report } = await build([mail('RE: TLM', QUOTED_EN)], { llm: c });
   const rec = records(ws)[0];
   assert.equal(rec.Summary, GOOD.summary);
-  assert.equal(rec['Issues description'], GOOD.issues_description);
+  assert.equal(rec['Issues description'], `"${GOOD.issues_description}"`);
   assert.equal(rec.Requestor, 'Jean-Luc Bérard');
   assert.equal(rec['Follow up by'], null);            // ungrounded -> dropped
   assert.equal(rec['Last remind Date'], '2026-09-15');
@@ -403,4 +403,58 @@ test('empty excerpt cells stay blank', async () => {
   const { ws } = await build([mail('Empty', '')]);
   assert.equal(records(ws)[0].Summary, null);
   assert.equal(records(ws)[0]['Issues description'], null);
+});
+
+test('core issue fallback keeps only a short excerpt of the current request', () => {
+  const mm = mail('Request', 'Please send the NAV file. Translation and additional detail.\nFrom: Bob\nSent: Monday, September 1, 2026 9:00 AM\nSubject: Old\nLong historical discussion.');
+  const row = m.localRow(mm, { coreOnly: true });
+  assert.equal(row.issues, 'Please send the NAV file.');
+});
+
+test('paraphrased issue descriptions fall back to a short original excerpt', async () => {
+  const { c } = client([reply({ ...GOOD, issues_description: 'Please resolve the NAV mismatch. Confirm the corrected value. ' + 'Extra background. '.repeat(100) })]);
+  const mm = mail('NAV', 'Please send the NAV file.');
+  const row = await c.enrich(mm, m.localRow(mm, { coreOnly: true }), FIXED_TODAY);
+  assert.equal(row.issues, 'Please send the NAV file.');
+  assert.equal(row.issueExcerpt, true);
+});
+
+test('issue description preserves an original French excerpt while summary stays English', async () => {
+  const { c } = client([reply({ ...GOOD, summary: 'The NAV file is needed for reconciliation.', issues_description: 'Merci de transmettre le fichier NAV.' })]);
+  const mm = mail('NAV', 'Bonjour,\nMerci de transmettre le fichier NAV.\nCordialement,\nAlice');
+  const row = await c.enrich(mm, m.localRow(mm, { coreOnly: true }), FIXED_TODAY);
+  assert.equal(row.summary, 'The NAV file is needed for reconciliation.');
+  assert.equal(row.issues, 'Merci de transmettre le fichier NAV.');
+  const report = [];
+  const { writeExcel } = await import('../src/excel.js');
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(await writeExcel([row], FIXED_TODAY, report));
+  assert.equal(wb.worksheets[0].getCell('D2').value, '"Merci de transmettre le fichier NAV."');
+});
+
+test('local core excerpt removes opening and closing lines', () => {
+  const row = m.localRow(mail('NAV', 'Hi team,\nPlease send the NAV file.\nBest regards,\nAlice'), { coreOnly: true });
+  assert.equal(row.issues, 'Please send the NAV file.');
+});
+
+test('failed API requests expose a redacted error for the page alert', async () => {
+  const { c } = client([new HttpError(401, 'Unauthorized sk-secret')]);
+  const alerts = [];
+  c.onError = message => alerts.push(message);
+  const mm = mail();
+  await c.enrich(mm, m.localRow(mm), FIXED_TODAY);
+  assert.equal(c.failureCount, 1);
+  assert.match(c.lastError, /401/);
+  assert.ok(!c.lastError.includes('sk-secret'));
+  assert.equal(alerts.length, 1);
+});
+
+test('declining fallback stops processing instead of returning an excerpt row', async () => {
+  const { c, calls } = client([new HttpError(401, 'Unauthorized')]);
+  let confirmations = 0;
+  c.confirmFallback = async () => { confirmations++; return false; };
+  const mm = mail();
+  await assert.rejects(c.enrich(mm, m.localRow(mm), FIXED_TODAY), /cancelled/i);
+  assert.equal(confirmations, 1);
+  assert.equal(calls.length, 1);
 });

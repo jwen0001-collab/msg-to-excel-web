@@ -20,16 +20,23 @@
       <label id="drop" class="drop" for="files">
         <span>Drop <b>.msg</b> files here or <u>click to choose</u> — one Excel file for the entire batch</span>
         <span class="hint">In Outlook, drag emails to your desktop to save them as .msg files.</span>
-        <span class="hint">Choose multiple files for a batch, or one .msg containing attached emails. Nested .msg attachments are read recursively; container emails do not get separate rows.</span>
+        <span class="hint">Choose how to count entries below. Either mode exports one Excel file for the entire batch.</span>
         <input id="files" type="file" accept=".msg" multiple>
       </label>
       <ul id="picked"></ul>
+      <fieldset id="processing-mode">
+        <legend>Processing mode</legend>
+        <label><input type="radio" name="mode" value="files" checked> Multi-file mode — one row per uploaded .msg file</label>
+        <p class="hint">11 readable files = 11 data rows. Attached emails are context, not extra rows.</p>
+        <label><input type="radio" name="mode" value="nested"> Nested mode — expand embedded .msg emails into separate rows</label>
+        <p class="hint">Recursively lists the innermost attached emails. Container emails are not separate rows; a file without attached emails contributes its own row.</p>
+      </fieldset>
     </section>
     <section>
       <details id="ai" open>
-        <summary><h2>2. AI summary and issue description (optional)</h2></summary>
+        <summary><h2>2. Summary and original issue excerpt (optional AI)</h2></summary>
         <p class="hint">
-          Enter your DeepSeek API key to generate an <b>English one-sentence Summary</b> and a <b>detailed Issues description</b> for each email.<br>
+          Enter your DeepSeek API key for an <b>English one-sentence topic Summary</b> and a <b>short original excerpt</b> of the core issue or request.<br>
           Leave the key blank to use original-text excerpts without AI.<br>
           Your key stays in this page only and is cleared when you reload or close it. Use AI only when permitted to share the email content with your selected provider.
         </p>
@@ -38,6 +45,8 @@
           <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your DeepSeek API key" aria-describedby="key-help">
         </div>
         <p id="key-help" class="hint">Ready to use with deepseek-flash. Only your API key is required.</p>
+        <p id="ai-error" class="warn" role="alert" hidden></p>
+        <p class="hint">If AI fails, an error and confirmation dialog appear. Original-excerpt fallback requires your approval; Cancel stops the batch without an Excel download.</p>
         <details id="advanced">
           <summary>Advanced: change provider or model</summary>
           <div class="grid">
@@ -52,7 +61,7 @@
     </section>
     <section>
       <h2>3. Export the entire batch to one Excel file</h2>
-      <p class="hint">The Excel file includes Summary (one sentence on the main topic) and Issues description (the issue, context, requested actions and stated deadlines). Original excerpts used offline or after a request fails are enclosed in double quotes.</p>
+      <p class="hint">Summary distills the topic into one sentence. Issues description quotes only the core original sentences, excluding openings, closings and signatures. For multilingual emails, one English or French version is sufficient. All original excerpts are enclosed in double quotes.</p>
       <button id="go" type="button" disabled>Generate batch Excel</button>
       <p id="status" role="status"></p>
       <ul id="results"></ul>

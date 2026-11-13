@@ -37,17 +37,41 @@ function msgFile(name, subject, nested = false) {
 const options = () => ({ domParser: new DOMParser(), entryDate: '2026-11-13' });
 const invalid = { name: 'broken.msg', arrayBuffer: async () => new ArrayBuffer(0) };
 
-test('one batch produces one workbook containing all files and embedded emails in order', async () => {
+test('each uploaded file occupies one row; embedded emails do not add rows', async () => {
   const result = await runner.runBatch([msgFile('one.msg', 'First'), msgFile('bundle.msg', 'Attached', true)], options());
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.load(result.xlsx);
   assert.equal(wb.worksheets.length, 1);
   const ws = wb.worksheets[0];
-  assert.equal(ws.rowCount, 4);
-  assert.deepEqual([2, 3, 4].map(n => ws.getCell(n, 2).value), ['First', 'Attached A', 'Attached B']);
-  assert.equal(ws.getCell('C4').value, '"Please send the NAV file."');
+  assert.equal(ws.rowCount, 3);
+  assert.deepEqual([2, 3].map(n => ws.getCell(n, 2).value), ['First', 'Attached']);
+  assert.equal(ws.getCell('C3').value, '"Please send the NAV file."');
   assert.equal(result.succeeded, 2);
   assert.equal(result.failed, 0);
+});
+
+test('eleven uploaded files produce exactly eleven data rows, including files with attachments', async () => {
+  const files = Array.from({ length: 11 }, (_, n) => msgFile(`${n}.msg`, `Request ${n}`, true));
+  const result = await runner.runBatch(files, options());
+  assert.equal(result.rows.length, 11);
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(result.xlsx);
+  assert.equal(wb.worksheets[0].rowCount, 12); // header plus eleven emails
+});
+
+test('embedded emails remain available to the summary as context for the uploaded file', async () => {
+  let received;
+  const llm = { enrich: async (mail, base) => { received = mail; return base; } };
+  const result = await runner.runBatch([msgFile('bundle.msg', 'Main request', true)], { ...options(), llm });
+  assert.equal(result.rows.length, 1);
+  assert.equal(received.subject, 'Main request');
+  assert.match(received.context, /Main request A/);
+  assert.match(received.context, /Main request B/);
+});
+
+test('nested mode expands attached messages into separate rows', async () => {
+  const result = await runner.runBatch([msgFile('bundle.msg', 'Attached', true)], { ...options(), mode: 'nested' });
+  assert.deepEqual(result.rows.map(row => row.subject), ['Attached A', 'Attached B']);
 });
 
 test('an unreadable file does not stop other files in the same workbook', async () => {

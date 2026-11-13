@@ -5,6 +5,19 @@ import { readMsg } from './readmsg.js';
 
 export const todayParis = () => isoDate(new Date());
 
+/** One uploaded file is one tracker entry; attached emails only supply context. */
+function trackingMail(root) {
+  const context = [];
+  const errors = [...root.errors];
+  function visit(mail) {
+    context.push(`Subject: ${mail.subject}\nFrom: ${mail.sender}\nSent: ${mail.sent ? isoDate(mail.sent) : ''}\n\n${mail.text}`);
+    errors.push(...mail.errors.map(error => `${mail.subject}: ${error}`));
+    mail.children.forEach(visit);
+  }
+  root.children.forEach(visit);
+  return { ...root, children: [], hadMailAttachments: false, context: context.join('\n\n'), errors };
+}
+
 /** Builds rows from an already-read Mail tree; shared by run() and the tests. */
 export async function buildRows(root, { entryDate, llm = null, log = () => {}, limits } = {}) {
   const report = [];
@@ -23,22 +36,24 @@ export async function buildRows(root, { entryDate, llm = null, log = () => {}, l
 }
 
 export async function run(bytes, { domParser, entryDate = todayParis(), llm = null, log = () => {} }) {
-  const root = readMsg(bytes, domParser);
+  const root = trackingMail(readMsg(bytes, domParser));
   if (!llm) {
     log('[local] Summary / Issues description are excerpts of the original text, ' +
         'not summaries or translations. Rule-based fields are left blank when unclear.');
   }
-  return buildRows(root, { entryDate, llm, log });
+  return buildRows(root, { entryDate, llm, log, limits: { coreOnly: true } });
 }
 
 /** Read every selected file, then write all email rows into one worksheet. */
-export async function runBatch(files, { domParser, entryDate = todayParis(), llm = null, log = () => {} } = {}) {
+export async function runBatch(files, { domParser, entryDate = todayParis(), llm = null, log = () => {}, mode = 'files' } = {}) {
+  if (!['files', 'nested'].includes(mode)) throw new Error('Choose multi-file or nested mode.');
   const roots = [];
   const errors = [];
   for (const [n, file] of files.entries()) {
     log(`Reading ${n + 1}/${files.length}: ${file.name}`);
     try {
-      roots.push(readMsg(new Uint8Array(await file.arrayBuffer()), domParser));
+      const mail = readMsg(new Uint8Array(await file.arrayBuffer()), domParser);
+      roots.push(mode === 'nested' ? mail : trackingMail(mail));
     } catch {
       // Parser exceptions can contain source data; keep the batch report concise.
       errors.push(`${file.name}: could not read this .msg file; skipped`);
@@ -47,7 +62,7 @@ export async function runBatch(files, { domParser, entryDate = todayParis(), llm
   const counts = { succeeded: roots.length, failed: errors.length };
   if (!roots.length) return { xlsx: null, rows: [], report: errors, ...counts };
   const root = makeMail({ subject: 'Batch', children: roots, hadMailAttachments: true, errors });
-  const result = await buildRows(root, { entryDate, llm, log });
+  const result = await buildRows(root, { entryDate, llm, log, limits: { coreOnly: true } });
   return { ...result, xlsx: result.rows.length ? result.xlsx : null, ...counts };
 }
 

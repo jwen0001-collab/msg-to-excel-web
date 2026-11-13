@@ -39,22 +39,41 @@ function llmFromForm() {
   return llmFromSettings(Object.fromEntries(['key', 'url', 'model'].map(id => [id, $(id).value])));
 }
 
+function showAIError(message) {
+  $('ai-error').hidden = false;
+  $('ai-error').textContent = `AI error: ${message}`;
+}
+
 async function processAll() {
+  $('ai-error').hidden = true;
+  $('ai-error').textContent = '';
   let llm;
   try {
     llm = llmFromForm();
   } catch (e) {
+    showAIError(e.message);
     $('status').textContent = e.message;
     return;
   }
   const batch = [...files];
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  let fallbackApproved = false;
+  if (llm) {
+    llm.onError = showAIError;
+    llm.confirmFallback = async message => {
+      if (fallbackApproved) return true;
+      fallbackApproved = window.confirm(`AI error: ${message}\n\nUse quoted original excerpts for affected entries and continue this batch?\nCancel stops the batch without downloading an Excel file.`);
+      return fallbackApproved;
+    };
+  }
   busy = true;
   $('go').disabled = true;
   $('files').disabled = true;
+  document.querySelectorAll('input[name="mode"]').forEach(input => { input.disabled = true; });
   $('results').replaceChildren();
   try {
     const { xlsx, report, rows, succeeded, failed } = await runBatch(batch, {
-      domParser, entryDate: todayParis(), llm,
+      domParser, entryDate: todayParis(), llm, mode,
       log: line => { $('status').textContent = line; },
     });
     const item = li('');
@@ -78,14 +97,15 @@ async function processAll() {
       box.append(summary, pre, download(report.join('\n') + '\n', name.replace(/\.xlsx$/, '_report.txt'), 'text/plain;charset=utf-8'));
       item.append(box);
     }
-    let mode = llm ? 'English summaries and issue descriptions; see processing notes for any fallback' : 'Original excerpts enclosed in double quotes';
-    if (llm && llm.unreachable) mode = 'The AI endpoint could not be reached (network or CORS); affected emails use quoted original excerpts';
-    $('status').textContent = `Done: ${succeeded}/${batch.length} file(s) read, ${failed} skipped. ${rows.length} email(s). ${mode}. ${xlsx ? 'One Excel file contains the entire batch. Use the link below to download it again.' : 'No Excel file generated.'}`;
+    let resultMode = llm ? 'One-sentence English topics and quoted original issue excerpts' : 'Original excerpts enclosed in double quotes';
+    if (llm && llm.failureCount) resultMode = `AI error affected ${llm.failureCount} entry/entries; original-excerpt fallback was approved`;
+    $('status').textContent = `Done: ${succeeded}/${batch.length} file(s) read, ${failed} skipped. ${rows.length} entry/entries. ${resultMode}. ${xlsx ? 'One Excel file contains the entire batch. Use the link below to download it again.' : 'No Excel file generated.'}`;
   } catch (e) {
     $('status').textContent = `Failed to generate the batch workbook: ${e && e.message ? e.message : e}`;
   } finally {
     busy = false;
     $('files').disabled = false;
+    document.querySelectorAll('input[name="mode"]').forEach(input => { input.disabled = false; });
     $('go').disabled = !files.length;
   }
 }

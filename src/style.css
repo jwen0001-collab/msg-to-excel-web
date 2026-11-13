@@ -23,3 +23,6 @@ li { margin: 6px 0; word-break: break-all; }
 pre { white-space: pre-wrap; font-size: 12px; background: color-mix(in srgb, currentColor 6%, transparent); padding: 8px; border-radius: 6px; }
 footer { margin-top: 40px; font-size: 13px; }
 a { color: var(--accent); }
+fieldset { margin-top: 16px; border: 1px solid #9ca3af; border-radius: 8px; }
+fieldset label { display: block; }
+fieldset .hint { margin: 4px 0 12px 24px; }

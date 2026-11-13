@@ -1,6 +1,6 @@
 // Optional LLM mode: OpenAI-compatible Chat Completions, called from the browser (port of llm_mode.py).
 // The key lives only in memory for this page; it is sent in the Authorization header and nowhere else.
-import { cpSlice, currentContent, parisParts, splitSegments } from './core.js';
+import { compactIssue, cpSlice, currentContent, parisParts, splitSegments } from './core.js';
 
 export const MAX_INPUT_CHARS = 12000;
 export const TIMEOUT_MS = 60000;
@@ -30,7 +30,7 @@ Keep names, terms, acronyms and accents exactly as written.
 Return ONLY a JSON object with exactly these keys:
 {
   "summary": "one English sentence: what needs following up",
-  "issues_description": "English: the concrete problem/request, explicit actions and deadlines",
+  "issues_description": "a short verbatim excerpt of the core issue/request from the original email body",
   "requestor": {"name": string or null, "evidence": string or null},
   "follow_up_by": [{"name": string, "evidence": string}],
   "urgent": {"value": true or false, "evidence": string or null},
@@ -38,16 +38,20 @@ Return ONLY a JSON object with exactly these keys:
 }
 Rules:
 - summary: exactly ONE concise English sentence summarizing the main topic and what needs following up. Do not copy the subject or opening greeting; use the underlying request for a bare forward or reminder.
-- issues_description: a clear English description of the concrete issue or request, relevant context from quoted history, impact, explicit next steps, and deadlines if stated. Distinguish the current request from past events. Omit greetings, signatures, disclaimers and irrelevant history; never fill gaps with guesses.
+- issues_description: COPY 1–2 short contiguous sentences (at most 320 characters) from the ORIGINAL body that express the core problem or request. Preserve the words exactly; do NOT paraphrase, translate, or copy the full email. Exclude greetings, introductions, signatures, closings and disclaimers. For bilingual/multilingual emails, choose ONLY ONE original English OR French version; never repeat translated versions of the same content. Use attached/quoted messages when they contain the actual request. Do not add quotation marks around the excerpt; the exporter adds them.
 - requestor: the person who makes the request in this e-mail (not merely whoever forwarded it). null if unsure.
 - follow_up_by: ONLY people the e-mail explicitly names as the contact / the one to follow up. Never infer from To/Cc. [] if none.
 - urgent: true only if the CURRENT message (not quoted history) explicitly says it is urgent, or Importance is High. "not urgent" / "pas urgent" is false.
 - last_remind: date of the most recent explicit reminder/chaser (the current message or a quoted one), not simply the latest sent date. null if none.
 - Every "evidence" must be an exact short quote copied from the e-mail text. If you cannot quote evidence, use null / [] / false.
 - Do not invent owners, deadlines or categories.
-- Write in plain, natural business English, with specific facts and direct verbs. Avoid stock introductions such as "This email discusses", filler, headings, labels, or any reference to AI or the summarization process. Return only the requested field contents in the JSON object.`;
+- summary: write in plain, natural English with direct verbs. Avoid stock introductions such as "This email discusses", filler, labels, or any reference to AI. The issue excerpt retains its original wording and language. Return only the requested field contents in the JSON object.`;
 
 const W = '[\\p{L}\\p{N}_]';
+
+export class FallbackDeclinedError extends Error {
+  constructor() { super('Export cancelled: original-excerpt fallback was not approved.'); }
+}
 
 export class HttpError extends Error {
   constructor(status, statusText) {
@@ -84,8 +88,12 @@ export function parseReply(resp) {
 export function applyReply(data, base, source, current, highImportance, today) {
   const grounded = ev => contains(source, ev);
   const named = name => (contains(source, name) ? name.trim() : '');
-  const row = { ...base, excerpts: false, summary: data.summary.trim(), issues: data.issues_description.trim(),
+  const candidate = data.issues_description.trim();
+  const originalExcerpt = source.includes(candidate);
+  const row = { ...base, excerpts: false, issueExcerpt: true, summary: data.summary.trim(), issues: originalExcerpt ? compactIssue(candidate) : compactIssue(base.issues, 1),
     requestor: '', followUpBy: [], urgent: false, lastRemind: null, notes: [] };
+  row.issueFallback = !originalExcerpt;
+  if (!originalExcerpt) row.notes.push('Issue excerpt was not found verbatim in the source; a local original excerpt was used.');
 
   const req = data.requestor || {};
   if (typeof req === 'object' && grounded(req.evidence)) row.requestor = named(req.name);
@@ -125,6 +133,10 @@ export class LLMClient {
     this._transport = transport || (p => this._http(p));
     this._sleep = sleep || (ms => new Promise(r => setTimeout(r, ms)));
     this.unreachable = false;
+    this.failureCount = 0;
+    this.lastError = '';
+    this.onError = null;
+    this.confirmFallback = null;
   }
 
   async _http(payload) {
@@ -136,7 +148,12 @@ export class LLMClient {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this._key}` },
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new HttpError(resp.status, resp.statusText);
+      if (!resp.ok) throw new HttpError(resp.status, ({
+        401: 'Invalid API key or authentication failed',
+        402: 'Insufficient balance',
+        404: 'API endpoint or model not found',
+        429: 'Rate limit or quota exceeded',
+      })[resp.status] || resp.statusText);
       return await resp.json();
     } finally {
       clearTimeout(timer);
@@ -147,6 +164,13 @@ export class LLMClient {
     return cpSlice(this._key ? msg.split(this._key).join('***') : msg, 0, 200);
   }
 
+  async _approveFallback(message) {
+    this.failureCount++;
+    this.lastError = message;
+    if (this.onError) this.onError(message);
+    if (this.confirmFallback && !(await this.confirmFallback(message))) throw new FallbackDeclinedError();
+  }
+
   buildSource(mail) {
     let sent = '';
     if (mail.sent) {
@@ -155,12 +179,14 @@ export class LLMClient {
     }
     const head = `Subject: ${mail.subject}\nFrom: ${mail.sender}\nSent: ${sent}\n` +
       `Importance: ${mail.highImportance ? 'High' : 'Normal'}\n\n`;
-    const truncated = Array.from(mail.text).length > MAX_INPUT_CHARS;
-    return [head + cpSlice(mail.text, 0, MAX_INPUT_CHARS), truncated];
+    const body = mail.text + (mail.context ? '\n\nAttached email context (not additional tracker entries):\n' + mail.context : '');
+    const truncated = Array.from(body).length > MAX_INPUT_CHARS;
+    return [head + cpSlice(body, 0, MAX_INPUT_CHARS), truncated];
   }
 
   async enrich(mail, base, today) {
     if (this.unreachable) {
+      this.failureCount++;
       return { ...base, notes: [...base.notes, 'LLM endpoint unreachable earlier in this run; local excerpts used, NOT an English summary'] };
     }
     const [source, truncated] = this.buildSource(mail);
@@ -176,9 +202,11 @@ export class LLMClient {
         const data = parseReply(await this._transport(payload));
         const current = mail.subject + '\n' + currentContent(splitSegments(mail));
         const row = applyReply(data, base, source, current, mail.highImportance, today);
+        if (row.issueFallback) await this._approveFallback('The returned issue excerpt did not match the original email text.');
         if (truncated) row.notes.push(`LLM input truncated to ${MAX_INPUT_CHARS} body chars`);
         return row;
       } catch (exc) {                       // one bad mail must not stop the run
+        if (exc instanceof FallbackDeclinedError) throw exc;
         lastErr = this._scrub(`${exc && exc.name ? exc.name : 'Error'}: ${exc && exc.message ? exc.message : exc}`);
         unreachable = isUnreachable(exc);
         if (exc instanceof HttpError && exc.status >= 400 && exc.status < 500 && exc.status !== 429) break;
@@ -190,6 +218,7 @@ export class LLMClient {
       this.unreachable = true;
       lastErr += ' (no response: blocked by CORS, proxy or network)';
     }
+    await this._approveFallback(lastErr);
     return { ...base, notes: [...base.notes, `LLM failed (${lastErr}); local excerpts used, NOT an English summary`] };
   }
 }

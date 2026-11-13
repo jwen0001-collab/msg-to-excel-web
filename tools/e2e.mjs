@@ -27,6 +27,7 @@ async function session(name, { ai, route } = {}) {
   const errors = [];
   let downloads = 0;
   page.on('download', () => { downloads++; });
+  page.on('dialog', dialog => dialog.accept()); // explicitly approve fallback in this test session
   const outside = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
