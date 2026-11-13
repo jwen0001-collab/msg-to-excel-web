@@ -1,58 +1,64 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Scripts only from this site; network requests only to the AI endpoint you type in (https). -->
+  <!-- Scripts only from this site; AI requests go only to the configured HTTPS endpoint. -->
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https:; form-action 'none'; base-uri 'none'">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" href="data:,">
-  <title>邮件转 Excel 跟进表</title>
+  <title>Email to Excel Follow-up Tracker</title>
   <link rel="stylesheet" href="./src/style.css">
 </head>
 <body>
   <main>
-    <h1>邮件转 Excel 跟进表</h1>
-    <p class="privacy">邮件只在你自己的浏览器里处理，<b>不会上传到任何服务器</b>。不填 AI Key 时全程不联网。</p>
-
+    <h1>Email to Excel Follow-up Tracker</h1>
+    <p class="privacy">Convert Outlook emails into an Excel follow-up tracker. Without an API key, processing stays in your browser. With a key, email text is sent to your selected AI provider.</p>
     <section>
-      <h2>1. 选择邮件</h2>
+      <h2>1. Select emails</h2>
       <label id="drop" class="drop" for="files">
-        <span>把 <b>.msg</b> 文件拖到这里，或<u>点这里选择</u>（可多选）</span>
-        <span class="hint">Outlook 里选中邮件，直接拖到桌面就会得到 .msg 文件</span>
+        <span>Drop <b>.msg</b> files here or <u>click to choose</u> (multiple files supported)</span>
+        <span class="hint">In Outlook, drag emails to your desktop to save them as .msg files.</span>
+        <span class="hint">Choose multiple files for a batch, or one .msg containing attached emails. Nested .msg attachments are read recursively; container emails do not get separate rows.</span>
         <input id="files" type="file" accept=".msg" multiple>
       </label>
       <ul id="picked"></ul>
     </section>
-
     <section>
-      <details id="ai">
-        <summary><h2>2. AI 总结（可选）</h2></summary>
+      <details id="ai" open>
+        <summary><h2>2. AI summary and issue description (optional)</h2></summary>
         <p class="hint">
-          不填：Summary / Issues description 是<b>原文摘录</b>，不翻译、不总结。<br>
-          填了：每封邮件的内容会发送到下面这个 AI 接口，生成英文总结。只在公司允许时使用。<br>
-          Key 只保存在这个页面里，<b>不会存到电脑上</b>，刷新或关闭页面就清空。
+          Enter your DeepSeek API key to generate an <b>English one-sentence Summary</b> and a <b>detailed Issues description</b> for each email.<br>
+          Leave the key blank to use original-text excerpts without AI.<br>
+          Your key stays in this page only and is cleared when you reload or close it. Use AI only when permitted to share the email content with your selected provider.
         </p>
         <div class="grid">
-          <label for="key">API Key</label>
-          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-...">
-          <label for="url">接口地址</label>
-          <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://.../v1">
-          <label for="model">模型</label>
-          <input id="model" type="text" autocomplete="off" spellcheck="false" placeholder="例如 gpt-4o-mini">
+          <label for="key">API key</label>
+          <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="Enter your DeepSeek API key" aria-describedby="key-help">
         </div>
+        <p id="key-help" class="hint">Ready to use with deepseek-flash. Only your API key is required.</p>
+        <details id="advanced">
+          <summary>Advanced: change provider or model</summary>
+          <div class="grid">
+            <label for="url">API base URL</label>
+            <input id="url" type="url" autocomplete="off" spellcheck="false" placeholder="https://api.deepseek.com" aria-describedby="provider-help">
+            <label for="model">Model</label>
+            <input id="model" type="text" autocomplete="off" spellcheck="false" placeholder="deepseek-flash" aria-describedby="provider-help">
+          </div>
+          <p id="provider-help" class="hint">Both fields are editable. Use an OpenAI-compatible HTTPS endpoint and its matching API key. Blank fields use the DeepSeek defaults.</p>
+        </details>
       </details>
     </section>
-
     <section>
-      <button id="go" type="button" disabled>生成 Excel</button>
+      <h2>3. Export your tracker</h2>
+      <p class="hint">The Excel file includes Summary (one sentence on the main topic) and Issues description (the issue, context, requested actions and stated deadlines). Original excerpts used offline or after a request fails are enclosed in double quotes.</p>
+      <button id="go" type="button" disabled>Generate Excel</button>
       <p id="status" role="status"></p>
       <ul id="results"></ul>
     </section>
-
     <footer>
-      <a href="https://github.com/jwen0001-collab/msg-to-excel-web" rel="noopener noreferrer">源代码</a>
+      <a href="https://github.com/jwen0001-collab/msg-to-excel-web" rel="noopener noreferrer">Source code</a>
     </footer>
   </main>
   <script type="module" src="./src/main.js"></script>

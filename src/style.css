@@ -12,7 +12,8 @@ section { margin-top: 24px; }
 .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 .drop input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 details summary { cursor: pointer; }
-.grid { display: grid; grid-template-columns: max-content 1fr; gap: 8px 12px; align-items: center; margin-top: 8px; }
+.grid { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; align-items: center; margin-top: 8px; }
+.grid input { min-width: 0; width: 100%; }
 .grid input { padding: 7px 9px; font: inherit; border: 1px solid #9ca3af; border-radius: 6px; background: transparent; color: inherit; }
 button { font: inherit; font-weight: 600; padding: 10px 22px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; cursor: pointer; }
 button:disabled { opacity: .45; cursor: default; }

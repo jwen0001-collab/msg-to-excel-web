@@ -249,6 +249,7 @@ export function localRow(mail, limits = {}) {
   const segs = splitSegments(mail);
   const content = currentContent(segs);
   const row = makeRow(mail.subject);
+  row.excerpts = true;
   row.summary = excerpt(content, summaryChars, true);
   // quoted messages are context for the request (e.g. "FYI" on top of the real content)
   row.issues = excerpt(segs.filter(s => s.text).map(s => s.text).join('\n\n'), issuesChars, false);

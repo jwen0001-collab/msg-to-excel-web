@@ -32,12 +32,14 @@ export async function writeExcel(rows, entryDate, report) {
         cell.numFmt = 'DD/MM/YYYY';
       } else if (v) {
         v = v.replace(ILLEGAL_CHARACTERS_RE, '');
+        const quoted = r.excerpts && (c === 2 || c === 3);
+        const limit = EXCEL_CELL_MAX - (quoted ? 2 : 0);
         const cps = Array.from(v);
-        if (cps.length > EXCEL_CELL_MAX) {
-          v = cps.slice(0, EXCEL_CELL_MAX).join('');
+        if (cps.length > limit) {
+          v = cps.slice(0, limit).join('');
           report.push(`row ${i}: '${HEADERS[c]}' truncated to ${EXCEL_CELL_MAX} chars`);
         }
-        cell.value = v;          // plain string: never a formula, even if it starts with '='
+        cell.value = quoted ? `"${v}"` : v; // plain text; only original excerpts get quotation marks
       }
       cell.alignment = { wrapText: true, vertical: 'top' };
     });

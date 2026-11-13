@@ -246,6 +246,7 @@ test('llm: success and evidence grounding', async () => {
   const { ws, report } = await build([mail('RE: TLM', QUOTED_EN)], { llm: c });
   const rec = records(ws)[0];
   assert.equal(rec.Summary, GOOD.summary);
+  assert.equal(rec['Issues description'], GOOD.issues_description);
   assert.equal(rec.Requestor, 'Jean-Luc Bérard');
   assert.equal(rec['Follow up by'], null);            // ungrounded -> dropped
   assert.equal(rec['Last remind Date'], '2026-09-15');
@@ -265,7 +266,7 @@ test('llm: invalid structure retries then falls back', async () => {
   const { c, calls } = client([reply({ summary: '' }), { oops: 1 }, new Error('x')]);
   const { ws, report } = await build([mail('Subj', 'Please send the NAV file.')], { llm: c });
   assert.equal(calls.length, 3);
-  assert.equal(records(ws)[0].Summary, 'Please send the NAV file.');
+  assert.equal(records(ws)[0].Summary, '"Please send the NAV file."');
   assert.ok(report.some(r => r.includes('row 2') && r.includes('LLM failed') && r.includes('NOT an English summary')));
 });
 
@@ -274,7 +275,7 @@ test('llm: one failure does not stop others, key never reported', async () => {
   const { c } = client([err(), err(), err(), reply(GOOD)]);
   const { ws, report } = await build([mail('A', 'first'), mail('RE: TLM', QUOTED_EN)], { llm: c });
   const recs = records(ws);
-  assert.equal(recs[0].Summary, 'first');
+  assert.equal(recs[0].Summary, '"first"');
   assert.equal(recs[1].Summary, GOOD.summary);
   assert.ok(report.every(r => !r.includes('sk-secret')));
 });
@@ -381,4 +382,25 @@ test('llm: unreachable endpoint (CORS/proxy) is not retried for every remaining 
 
 test('output name is stem + Paris timestamp', () => {
   assert.equal(outputName('Mail.MSG', new Date('2026-10-02T13:04:05Z')), 'Mail_followup_20261002_150405.xlsx');
+});
+
+test('offline excerpts are enclosed in double quotes in Excel', async () => {
+  const { ws } = await build([mail('NAV request', 'Please send the NAV file.')]);
+  const rec = records(ws)[0];
+  assert.equal(rec.Summary, '"Please send the NAV file."');
+  assert.equal(rec['Issues description'], '"Please send the NAV file."');
+  assert.equal(rec['Email Subject'], 'NAV request');
+});
+
+test('truncated fallback excerpt keeps both quotation marks within the Excel cell limit', async () => {
+  const { ws } = await build([mail('Long', 'x '.repeat(20000))], { limits: { issuesChars: 1e6 } });
+  const text = records(ws)[0]['Issues description'];
+  assert.equal(text.length, m.EXCEL_CELL_MAX);
+  assert.ok(text.startsWith('"') && text.endsWith('"'));
+});
+
+test('empty excerpt cells stay blank', async () => {
+  const { ws } = await build([mail('Empty', '')]);
+  assert.equal(records(ws)[0].Summary, null);
+  assert.equal(records(ws)[0]['Issues description'], null);
 });

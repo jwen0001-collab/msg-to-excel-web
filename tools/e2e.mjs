@@ -33,14 +33,13 @@ async function session(name, { ai, route } = {}) {
   await page.goto(base);
   await page.setInputFiles('#files', msgPath);
   if (ai) {
-    await page.click('#ai summary');
     await page.fill('#key', 'sk-e2e-secret');
     await page.fill('#url', 'https://ai.example.test/v1');
     await page.fill('#model', 'm');
   }
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 60000 }), page.click('#go')]);
   await dl.saveAs(path.join(outDir, `${name}.xlsx`));
-  await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('完成'), null, { timeout: 60000 });
+  await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('Done:'), null, { timeout: 60000 });
   const status = await page.textContent('#status');
   const results = await page.textContent('#results');
   await page.screenshot({ path: path.join(outDir, `${name}.png`), fullPage: true });

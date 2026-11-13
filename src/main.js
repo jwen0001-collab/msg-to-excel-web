@@ -1,15 +1,17 @@
-import { LLMClient } from './llm.js';
+import { DEFAULT_BASE_URL, DEFAULT_MODEL, llmFromSettings } from './llm.js';
 import { outputName, run, todayParis } from './run.js';
 
 const $ = id => document.getElementById(id);
 const domParser = new DOMParser();
 let files = [];
+$('url').value = DEFAULT_BASE_URL;
+$('model').value = DEFAULT_MODEL;
 
 function setFiles(list) {
   files = [...list].filter(f => f.name.toLowerCase().endsWith('.msg'));
   const skipped = list.length - files.length;
   $('picked').replaceChildren(...files.map(f => li(f.name)));
-  if (skipped) $('picked').append(li(`已忽略 ${skipped} 个不是 .msg 的文件`, 'warn'));
+  if (skipped) $('picked').append(li(`Skipped ${skipped} file(s) that are not .msg files.`, 'warn'));
   $('go').disabled = !files.length;
   $('status').textContent = '';
 }
@@ -30,13 +32,9 @@ function download(bytes, name, type) {
   return a;
 }
 
-/** null = local mode; throws when the AI fields are only partly filled. */
+/** No key = offline mode, even with prefilled advanced settings. */
 function llmFromForm() {
-  const [key, url, model] = ['key', 'url', 'model'].map(id => $(id).value.trim());
-  if (!key && !url && !model) return null;
-  if (!key || !url || !model) throw new Error('AI 总结需要同时填 API Key、接口地址、模型；不用 AI 就三项都清空。');
-  if (!/^https:\/\//i.test(url)) throw new Error('接口地址必须以 https:// 开头。');
-  return new LLMClient(key, url, model);
+  return llmFromSettings(Object.fromEntries(['key', 'url', 'model'].map(id => [id, $(id).value])));
 }
 
 async function processAll() {
@@ -53,7 +51,7 @@ async function processAll() {
   let failed = 0;
 
   for (const [n, file] of files.entries()) {
-    $('status').textContent = `正在处理 ${n + 1}/${files.length}：${file.name}`;
+    $('status').textContent = `Processing ${n + 1}/${files.length}: ${file.name}`;
     const item = li('');
     const title = document.createElement('b');
     title.textContent = file.name;
@@ -61,17 +59,17 @@ async function processAll() {
     $('results').append(item);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const log = line => { $('status').textContent = `${file.name}：${line}`; };
+      const log = line => { $('status').textContent = `${file.name}: ${line}`; };
       const { xlsx, report, rows } = await run(bytes, { domParser, entryDate, llm, log });
       const name = outputName(file.name);
       const link = download(xlsx, name, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      item.append(` — ${rows.length} 封邮件 → `, link);
+      item.append(` — ${rows.length} email(s) → `, link);
       link.click();
       if (report.length) {
         const box = document.createElement('details');
         box.open = true;
         const s = document.createElement('summary');
-        s.textContent = `${report.length} 条说明（截断、AI 失败、读不了的附件等），不在表格里`;
+        s.textContent = `${report.length} processing note(s): truncation, AI failures or unreadable attachments (separate from the worksheet)`;
         const pre = document.createElement('pre');
         pre.textContent = report.join('\n');
         box.append(s, pre, download(report.join('\n') + '\n', name.replace(/\.xlsx$/, '_report.txt'), 'text/plain;charset=utf-8'));
@@ -80,14 +78,14 @@ async function processAll() {
     } catch (e) {
       failed++;
       item.classList.add('warn');
-      item.append(` — 失败，没有生成 Excel：${e && e.message ? e.message : e}`);
+      item.append(` — Failed; no Excel file generated: ${e && e.message ? e.message : e}`);
     }
   }
-  let mode = llm ? 'AI 总结' : '本地模式（Summary / Issues 为原文摘录，不是总结或翻译）';
+  let mode = llm ? 'AI mode: English summaries and issue descriptions; check processing notes for any fallback to original excerpts' : 'Offline mode: Summary / Issues description contain original excerpts, not summaries or translations';
   if (llm && llm.unreachable) {
-    mode = 'AI 接口连不上（多半是公司网络拦截，或接口不允许网页直接调用），这次用的是原文摘录';
+    mode = 'The AI endpoint could not be reached (network or CORS). Affected emails use original excerpts; see processing notes';
   }
-  $('status').textContent = `完成：${files.length - failed}/${files.length} 个文件。${mode}。Excel 已自动下载，也可以点下面的文件名再下载一次。`;
+  $('status').textContent = `Done: ${files.length - failed}/${files.length} file(s). ${mode}. Downloads were started automatically; use the links below to download again.`;
   $('go').disabled = false;
 }
 

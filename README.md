@@ -1,64 +1,66 @@
-# 邮件转 Excel 跟进表（网页版）
+# Email to Excel Follow-up Tracker
 
-**打开就能用：https://jwen0001-collab.github.io/msg-to-excel-web/**
+**Open the app: https://jwen0001-collab.github.io/msg-to-excel-web/**
 
-把 Outlook 导出的 `.msg` 邮件（包括里面作为附件的邮件）逐封整理成 11 列的跟进表 Excel。
-不用安装任何东西，不用懂代码。
+Convert Outlook `.msg` emails, including embedded `.msg` attachments, into an Excel follow-up tracker. No installation is required. The interface, processing messages and Excel column headings are in English.
 
-## 怎么用
+## Usage
 
-1. 在 Outlook 里选中邮件，**直接拖到桌面**（或：文件 → 另存为 → 类型选 "Outlook 邮件格式 (*.msg)"），得到 `.msg` 文件。
-2. 打开上面的网址，把 `.msg` 拖进虚线框（或点虚线框选择，可以一次选多个）。
-3. 点 **生成 Excel**，浏览器会自动下载结果，每个 `.msg` 一个 Excel。
+1. Drag emails from Outlook to your desktop, or use **File → Save As → Outlook Message Format (*.msg)**.
+2. Open the app and drop one or more `.msg` files into the upload area.
+3. Enter your **DeepSeek API key** for English summaries and issue descriptions. The API base URL defaults to `https://api.deepseek.com` and the model defaults to **`deepseek-flash`**. You only need to enter your key each time.
+4. To use another model or provider, expand **Advanced: change provider or model** and edit the model and/or API base URL. Use the matching provider's API key. Blank advanced fields fall back to the DeepSeek defaults.
+5. Click **Generate Excel**. Each uploaded `.msg` produces one workbook. Download links and any processing notes appear below the button.
 
-## 安全
+Leave the key blank for offline conversion, even with the default provider/model filled in. In offline mode, Summary and Issues description are **original-text excerpts enclosed in double quotes**, not generated summaries or translations. Failed AI requests also fall back to quoted excerpts. Empty cells stay blank. Generated text uses natural business English without AI labels or boilerplate; processing notes remain outside the worksheet.
 
-- 邮件**只在你自己的浏览器里处理**，不会上传到任何服务器；没有数据库，不记录任何东西。
-- 不填 AI Key 时，页面加载完之后**完全不联网**。页面设置了安全策略：只运行本站的代码，不加载任何外部脚本。
-- 想确认的话：按 `F12` → Network（网络）标签，处理邮件时不会出现任何新的请求。
+Select multiple files to process them in one batch. Alternatively, upload a single .msg containing attached emails: nested .msg attachments are read recursively, with one row per leaf email. Container emails are not exported as separate rows. Quoted email history in the body is used as context rather than split into separate rows. Emails that are neither attached nor quoted cannot be retrieved from Outlook automatically.
 
-## AI 总结（可选）
+## AI summary and issue description
 
-不填时，Summary / Issues description 是**原文摘录**（原语言），不是总结或翻译。
+With an API key, each email is sent to the configured OpenAI-compatible `POST {base URL}/chat/completions` endpoint to generate:
 
-在 "2. AI 总结" 里填 API Key、接口地址、模型后，每封邮件会发送到**你填的这个接口**，生成英文总结：
+- **Summary:** one concise English sentence describing the main topic and what needs following up. For a bare forward or reminder, use the underlying request.
+- **Issues description:** an English description of the concrete issue or request, relevant email history, impact, explicit actions and stated deadlines. Greetings, signatures and disclaimers are omitted; missing facts must not be invented.
 
-- 接口需要兼容 OpenAI 的 `POST {接口地址}/chat/completions`。
-- Key 只存在这个页面的内存里，**不保存到电脑上**，刷新或关闭页面就清空，不会出现在 Excel 和说明里。
-- 人员、紧急、催办日期必须能在邮件原文里找到依据，找不到就留空。
-- 某封失败时，该行改用原文摘录，并在说明里写明。
-- 如果提示 "AI 接口连不上"：多半是公司网络拦截，或者该接口不允许网页直接调用（CORS）。这时需要请 IT 放行本网址。
-- **只在公司允许把邮件内容发给该 AI 接口时使用。**
+Names, acronyms and project terms retain their original spelling. People, urgency and reminder dates require supporting evidence in the email. The original Email Subject remains unchanged.
 
-## 各列规则
+If AI fails for an email, its row uses original excerpts and a separate processing report explains the fallback. An unreachable endpoint may indicate a network restriction or a provider that does not permit direct browser requests (CORS).
 
-| 列 | 规则 |
+## Privacy
+
+- Without a key, email parsing and Excel generation run locally in the browser without AI requests.
+- With a key, email text is sent to the selected AI endpoint. Use this mode only when sharing that content with the provider is permitted.
+- The key is kept in page memory only. It is not stored in browser storage or included in Excel files or reports. Reloading or closing the page clears it.
+- There is no application backend or database. The page loads no external scripts.
+
+## Excel columns
+
+| Column | Rule |
 |---|---|
-| Entry date | 生成当天（巴黎时间） |
-| Email Subject | 原样保留 |
-| Summary | 当前邮件开头约 200 字的原文摘录；纯转发时取被转发的内容 |
-| Issues description | 当前邮件 + 引用的历史邮件的原文摘录，约 1000 字；去掉免责声明和引用邮件头 |
-| Requestor | 发件人显示名；标题以 FW / Fwd / TR 开头时留空（转发人不等于请求人） |
-| Follow up by | 只认明确句式：Please contact X / Merci de contacter X / Suivi par X 等，否则留空 |
+| Entry date | Date of conversion in Paris time |
+| Email Subject | Original subject, unchanged |
+| Summary | AI: one-sentence English topic summary. Offline/fallback: approximately 200 characters of the current message, or underlying content for a bare forward |
+| Issues description | AI: concrete issue, context, actions and stated deadlines in English. Offline/fallback: approximately 1,000 characters of current and quoted content, excluding disclaimers and quoted headers |
+| Requestor | Sender's display name; blank for FW/Fwd/TR forwards in offline mode. AI requires evidence of the original requestor |
+| Follow up by | Explicitly designated contacts only; otherwise blank |
 | Status | Open |
-| Priority | 高重要性标记，或标题 / 当前正文出现 urgent、urgence、ASAP 等时为 Urgent；排除 not urgent / pas urgent，引用历史里的不算 |
-| Opening date | 留空 |
-| Last remind Date | 当前或引用邮件里有 reminder / relance / petit rappel 等催办措辞时，取最近一封的日期；纯数字日期（日月顺序有歧义）留空 |
-| Last update | 留空 |
+| Priority | Urgent for high importance or explicit urgency in the current subject/body; negated urgency and quoted history alone do not qualify |
+| Opening date | Blank |
+| Last remind Date | Most recent explicit reminder date; ambiguous numeric dates are left blank in offline mode |
+| Last update | Blank |
 
-附件里的 `.eml` 等非 `.msg` 邮件不处理，会写进表格下方的说明里，不会悄悄丢掉。
+Unsupported mail attachments such as `.eml` files are reported separately. Embedded `.msg` attachments are processed recursively.
 
-## 开发
+## Development
 
-规则移植自 Python 版（`msg_to_excel.py`），同一封邮件两边输出逐格一致。
-
-```
-npm install
-npm test          # 单元测试
-npm run dev       # 本地预览
-npm run build     # 生成 dist/
-node tools/golden.mjs <邮件.msg> <输出.xlsx> <YYYY-MM-DD>   # 与 Python 版对照用
-node tools/e2e.mjs <邮件.msg> <输出目录> [chrome.exe]        # 真实浏览器测试（先 build）
+```sh
+npm ci
+npm test
+npm run dev
+npm run build
+node tools/golden.mjs <email.msg> <output.xlsx> <YYYY-MM-DD>
+node tools/e2e.mjs <email.msg> <output-directory> [chrome.exe]
 ```
 
-不要把真实邮件提交进仓库（`.gitignore` 已排除 `.msg` / `.xlsx`）。
+Never commit real emails, API keys or exported workbooks. `.gitignore` excludes `.msg`, `.eml`, `.xlsx` and report files. The rule-based parser preserves the original Python tool's column contract.
