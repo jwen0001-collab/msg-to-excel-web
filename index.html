@@ -18,7 +18,7 @@
     <section>
       <h2>1. Select emails</h2>
       <label id="drop" class="drop" for="files">
-        <span>Drop <b>.msg</b> files here or <u>click to choose</u> (multiple files supported)</span>
+        <span>Drop <b>.msg</b> files here or <u>click to choose</u> — one Excel file for the entire batch</span>
         <span class="hint">In Outlook, drag emails to your desktop to save them as .msg files.</span>
         <span class="hint">Choose multiple files for a batch, or one .msg containing attached emails. Nested .msg attachments are read recursively; container emails do not get separate rows.</span>
         <input id="files" type="file" accept=".msg" multiple>
@@ -51,9 +51,9 @@
       </details>
     </section>
     <section>
-      <h2>3. Export your tracker</h2>
+      <h2>3. Export the entire batch to one Excel file</h2>
       <p class="hint">The Excel file includes Summary (one sentence on the main topic) and Issues description (the issue, context, requested actions and stated deadlines). Original excerpts used offline or after a request fails are enclosed in double quotes.</p>
-      <button id="go" type="button" disabled>Generate Excel</button>
+      <button id="go" type="button" disabled>Generate batch Excel</button>
       <p id="status" role="status"></p>
       <ul id="results"></ul>
     </section>

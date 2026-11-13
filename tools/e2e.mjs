@@ -25,13 +25,15 @@ const fail = msg => { console.log('FAIL', msg); process.exitCode = 1; };
 async function session(name, { ai, route } = {}) {
   const page = await browser.newPage({ acceptDownloads: true });
   const errors = [];
+  let downloads = 0;
+  page.on('download', () => { downloads++; });
   const outside = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', e => errors.push(String(e)));
   page.on('request', r => { if (!r.url().startsWith(base) && !r.url().startsWith('blob:')) outside.push(r.url()); });
   if (route) await page.route('https://ai.example.test/**', route);
   await page.goto(base);
-  await page.setInputFiles('#files', msgPath);
+  await page.setInputFiles('#files', [msgPath, msgPath]);
   if (ai) {
     await page.fill('#key', 'sk-e2e-secret');
     await page.fill('#url', 'https://ai.example.test/v1');
@@ -42,6 +44,9 @@ async function session(name, { ai, route } = {}) {
   await page.waitForFunction(() => document.getElementById('status').textContent.startsWith('Done:'), null, { timeout: 60000 });
   const status = await page.textContent('#status');
   const results = await page.textContent('#results');
+  if (downloads !== 1) fail(`${name}: expected one download for the entire batch, got ${downloads}`);
+  if (await page.locator('#results a[download$=".xlsx"]').count() !== 1) fail(`${name}: expected one workbook link`);
+  if (!status.includes('2/2 file(s)')) fail(`${name}: did not process both input files`);
   await page.screenshot({ path: path.join(outDir, `${name}.png`), fullPage: true });
   await page.close();
   console.log(`[${name}] download=${dl.suggestedFilename()}\n  status=${status}\n  results=${results.slice(0, 300)}`);
