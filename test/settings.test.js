@@ -29,3 +29,16 @@ test('AI settings reject non-HTTPS and malformed endpoints before sending the ke
     assert.throws(() => llm.llmFromSettings({ key: 'sk-test', url }), /HTTPS base URL/);
   }
 });
+
+test('Vercel mode sends the request to the same-origin relay instead of the external API', async t => {
+  let sent;
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    sent = { url, options };
+    return Response.json({ choices: [] });
+  });
+  const client = llm.llmFromSettings({ key: 'sk-test', relayPath: '/api/chat' });
+  await client._http({ model: 'deepseek-flash', messages: [] });
+  assert.equal(sent.url, '/api/chat');
+  assert.equal(sent.options.headers['X-AI-Endpoint'], 'https://api.deepseek.com/chat/completions');
+  assert.equal(sent.options.headers.Authorization, 'Bearer sk-test');
+});

@@ -9,7 +9,7 @@ export const DEFAULT_BASE_URL = 'https://api.deepseek.com';
 export const DEFAULT_MODEL = 'deepseek-flash';
 
 /** A key enables AI; advanced settings are optional and never persisted. */
-export function llmFromSettings({ key = '', url = '', model = '' } = {}) {
+export function llmFromSettings({ key = '', url = '', model = '', relayPath = '' } = {}) {
   key = key.trim();
   if (!key) return null;
   url = url.trim() || DEFAULT_BASE_URL;
@@ -19,7 +19,7 @@ export function llmFromSettings({ key = '', url = '', model = '' } = {}) {
   if (!endpoint || endpoint.protocol !== 'https:' || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
     throw new Error('Enter a valid HTTPS base URL without credentials, query parameters or fragments.');
   }
-  return new LLMClient(key, url, model);
+  return new LLMClient(key, url, model, { relayPath });
 }
 
 export const SYSTEM_PROMPT = `You extract follow-up information from ONE business e-mail for a tracking sheet.
@@ -126,10 +126,11 @@ export function applyReply(data, base, source, current, highImportance, today) {
 
 export class LLMClient {
   /** transport(payload) -> parsed JSON reply; injectable for tests. */
-  constructor(key, baseUrl, model, { transport, sleep } = {}) {
+  constructor(key, baseUrl, model, { transport, sleep, relayPath = '' } = {}) {
     this._key = key;
     this.url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
     this.model = model;
+    this.relayPath = relayPath;
     this._transport = transport || (p => this._http(p));
     this._sleep = sleep || (ms => new Promise(r => setTimeout(r, ms)));
     this.unreachable = false;
@@ -143,17 +144,22 @@ export class LLMClient {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
     try {
-      const resp = await fetch(this.url, {
+      const resp = await fetch(this.relayPath || this.url, {
         method: 'POST', signal: ctrl.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this._key}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this._key}`,
+          ...(this.relayPath ? { 'X-AI-Endpoint': this.url } : {}) },
         body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new HttpError(resp.status, ({
+      if (!resp.ok) {
+        let detail = '';
+        try { const data = await resp.json(); if (typeof data?.error?.message === 'string') detail = data.error.message; } catch { /* use the status description */ }
+        throw new HttpError(resp.status, detail || ({
         401: 'Invalid API key or authentication failed',
         402: 'Insufficient balance',
         404: 'API endpoint or model not found',
         429: 'Rate limit or quota exceeded',
-      })[resp.status] || resp.statusText);
+        })[resp.status] || resp.statusText);
+      }
       return await resp.json();
     } finally {
       clearTimeout(timer);

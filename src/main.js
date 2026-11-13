@@ -7,6 +7,9 @@ let files = [];
 let busy = false;
 $('url').value = DEFAULT_BASE_URL;
 $('model').value = DEFAULT_MODEL;
+if (import.meta.env.VITE_AI_RELAY_PATH) {
+  $('key-help').textContent = 'Ready to use with deepseek-flash. Only your API key is required. Requests are forwarded through this website; no deployment secrets need to be configured.';
+}
 
 function setFiles(list) {
   if (busy) return;
@@ -36,7 +39,8 @@ function download(bytes, name, type) {
 
 /** No key = offline mode, even with prefilled advanced settings. */
 function llmFromForm() {
-  return llmFromSettings(Object.fromEntries(['key', 'url', 'model'].map(id => [id, $(id).value])));
+  return llmFromSettings({ ...Object.fromEntries(['key', 'url', 'model'].map(id => [id, $(id).value])),
+    relayPath: import.meta.env.VITE_AI_RELAY_PATH || '' });
 }
 
 function showAIError(message) {

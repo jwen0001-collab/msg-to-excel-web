@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- Scripts only from this site; AI requests go only to the configured HTTPS endpoint. -->
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https:; form-action 'none'; base-uri 'none'">
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https:; form-action 'none'; base-uri 'none'">
   <meta name="referrer" content="no-referrer">
   <link rel="icon" href="data:,">
   <title>Email to Excel Follow-up Tracker</title>
@@ -14,7 +14,7 @@
 <body>
   <main>
     <h1>Email to Excel Follow-up Tracker</h1>
-    <p class="privacy">Convert Outlook emails into an Excel follow-up tracker. Without an API key, processing stays in your browser. With a key, email text is sent to your selected AI provider.</p>
+    <p class="privacy">Convert Outlook emails into an Excel follow-up tracker. Without an API key, processing stays in your browser. With a key, email text is sent to your selected AI provider; the Vercel version forwards it through this website.</p>
     <section>
       <h2>1. Select emails</h2>
       <label id="drop" class="drop" for="files">
@@ -38,7 +38,7 @@
         <p class="hint">
           Enter your DeepSeek API key for an <b>English one-sentence topic Summary</b> and a <b>short original excerpt</b> of the core issue or request.<br>
           Leave the key blank to use original-text excerpts without AI.<br>
-          Your key stays in this page only and is cleared when you reload or close it. Use AI only when permitted to share the email content with your selected provider.
+          Your key is cleared when you reload or close this page. The application does not store keys or email content. Use AI only when permitted to share the content with your provider and this site's hosting service.
         </p>
         <div class="grid">
           <label for="key">API key</label>
@@ -55,7 +55,7 @@
             <label for="model">Model</label>
             <input id="model" type="text" autocomplete="off" spellcheck="false" placeholder="deepseek-flash" aria-describedby="provider-help">
           </div>
-          <p id="provider-help" class="hint">Both fields are editable. Use an OpenAI-compatible HTTPS endpoint and its matching API key. Blank fields use the DeepSeek defaults.</p>
+          <p id="provider-help" class="hint">Both fields are editable. Blank fields use the DeepSeek defaults. The Vercel relay supports the official DeepSeek and OpenAI Chat Completions endpoints; use the matching provider's key and model.</p>
         </details>
       </details>
     </section>

@@ -4,6 +4,7 @@
   "scripts": {
     "test": "node --test --test-concurrency=1 test/*.test.js",
     "build": "vite build",
+    "build:vercel": "vite build --mode vercel",
     "dev": "vite"
   },
   "type": "module",

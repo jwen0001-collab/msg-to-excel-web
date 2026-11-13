@@ -2,6 +2,18 @@
 
 **Open the app: https://jwen0001-collab.github.io/msg-to-excel-web/**
 
+For AI access without the provider's browser CORS restrictions, deploy the full app to Vercel and use the URL Vercel provides. GitHub Pages is a static-only build and cannot run the relay.
+
+## Deploy to Vercel — no environment variables
+
+1. Push this repository's latest changes to GitHub.
+2. Sign in at https://vercel.com/new, import **jwen0001-collab/msg-to-excel-web**, and click **Deploy**. Keep the root directory and project settings at their defaults. Do not add an API key or any environment variables.
+3. Open the deployment's URL and enter your API key on the page as usual.
+
+The committed `vercel.json` selects the Vite build and deploys `api/chat.js` as a function. The Vercel build automatically sends requests to `/api/chat` on the same website, avoiding a browser request to the AI provider. The relay forwards each request using the key supplied on the page; it has no stored credentials, database, or application request logging. The supported relay destinations are the official DeepSeek and OpenAI Chat Completions endpoints. Custom model names remain editable.
+
+AI provider usage and hosting remain subject to their respective accounts and plans. An actual model call requires your valid provider key and account balance. Server-side connectivity problems remain possible and are shown as errors; fallback still requires confirmation.
+
 Convert Outlook `.msg` emails, including embedded `.msg` attachments, into an Excel follow-up tracker. No installation is required. The interface, processing messages and Excel column headings are in English.
 
 ## Usage
@@ -18,7 +30,7 @@ Both modes combine the entire batch into one workbook. Multi-file mode preserves
 
 ## AI summary and issue description
 
-With an API key, each email is sent to the configured OpenAI-compatible `POST {base URL}/chat/completions` endpoint to generate:
+With an API key, each email is sent to the configured OpenAI-compatible `POST {base URL}/chat/completions` endpoint, through the same-origin relay in the Vercel build, to generate:
 
 - **Summary:** one concise English sentence describing the main topic and what needs following up. For a bare forward or reminder, use the underlying request.
 - **Issues description:** select only 1–2 short contiguous sentences from the original body that express the core problem or request, capped at 320 characters. Exclude openings, closings, signatures and disclaimers. Do not paraphrase or translate. For multilingual emails, retain only one original English or French version, without repeating translations. The exporter encloses the excerpt in double quotes and checks that the selected wording exists in the source.
@@ -30,9 +42,9 @@ If an AI request fails, the page shows the error (including authentication, bala
 ## Privacy
 
 - Without a key, email parsing and Excel generation run locally in the browser without AI requests.
-- With a key, email text is sent to the selected AI endpoint. Use this mode only when sharing that content with the provider is permitted.
-- The key is kept in page memory only. It is not stored in browser storage or included in Excel files or reports. Reloading or closing the page clears it.
-- There is no application backend or database. The page loads no external scripts.
+- With a key, email text is sent to the selected AI endpoint. In the Vercel build, the hosting service relays the text and key. Use this mode only when sharing that content with those services is permitted.
+- The key is kept in page memory and used transiently for each relay request. The application does not persist or log keys or email content. Keys are not stored in browser storage or included in Excel files or reports. Reloading or closing the page clears the form.
+- The Vercel backend only forwards requests; it has no database. The page loads no external scripts.
 
 ## Excel columns
 
@@ -59,6 +71,7 @@ npm ci
 npm test
 npm run dev
 npm run build
+npm run build:vercel  # build for Vercel with the same-origin relay
 node tools/golden.mjs <email.msg> <output.xlsx> <YYYY-MM-DD>
 node tools/e2e.mjs <email.msg> <output-directory> [chrome.exe]
 ```
