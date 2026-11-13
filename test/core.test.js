@@ -283,7 +283,8 @@ test('llm: one failure does not stop others, key never reported', async () => {
 test('llm: input truncation reported', async () => {
   const { c, calls } = client([reply({ ...GOOD, requestor: { name: null, evidence: null } })]);
   const { report } = await build([mail('Big', 'y '.repeat(20000))], { llm: c });
-  assert.ok(calls[0].messages[1].content.length < MAX_INPUT_CHARS + 500);
+  assert.ok(calls[0].messages[1].content.split('</email>')[0].length < MAX_INPUT_CHARS + 500);
+  assert.ok(calls[0].messages[1].content.length < MAX_INPUT_CHARS + 12000);
   assert.ok(report.some(r => r.includes('row 2') && r.includes('truncated')));
 });
 

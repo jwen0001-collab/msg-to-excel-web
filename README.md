@@ -33,7 +33,7 @@ Both modes combine the entire batch into one workbook. Multi-file mode preserves
 With an API key, each email is sent to the configured OpenAI-compatible `POST {base URL}/chat/completions` endpoint, through the same-origin relay in the Vercel build, to generate:
 
 - **Summary:** one concise English sentence describing the main topic and what needs following up. For a bare forward or reminder, use the underlying request.
-- **Issues description:** select only 1–2 short contiguous sentences from the original body that express the core problem or request, capped at 320 characters. Exclude openings, closings, signatures and disclaimers. Do not paraphrase or translate. For multilingual emails, retain only one original English or French version, without repeating translations. The exporter encloses the excerpt in double quotes and checks that the selected wording exists in the source.
+- **Issues description:** the app numbers short original body excerpts (up to 320 characters), excluding greetings, closings and headers. The model selects the number of the core problem/request; the app inserts the original wording in double quotes. The model does not copy or rewrite the excerpt, avoiding false mismatches caused by its formatting. For multilingual emails, choose one original English or French version without repeating translations. Summary remains a separately generated one-sentence topic.
 
 Names, acronyms and project terms retain their original spelling. People, urgency and reminder dates require supporting evidence in the email. The original Email Subject remains unchanged.
 
