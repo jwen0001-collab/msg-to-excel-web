@@ -35,7 +35,7 @@ With an API key, each email is sent to the configured OpenAI-compatible `POST {b
 - **Summary:** one concise English sentence describing the main topic and what needs following up. For a bare forward or reminder, use the underlying request.
 - **Issues description:** the app numbers short original body excerpts (up to 320 characters), excluding greetings, closings and headers. The model selects the number of the core problem/request; the app inserts the original wording in double quotes. The model does not copy or rewrite the excerpt, avoiding false mismatches caused by its formatting. For multilingual emails, choose one original English or French version without repeating translations. Summary remains a separately generated one-sentence topic.
 
-Names, acronyms and project terms retain their original spelling. People, urgency and reminder dates require supporting evidence in the email. The original Email Subject remains unchanged.
+Names, acronyms and project terms retain their original spelling. People and urgency require supporting evidence in the email. Last remind Date is always read from the corresponding email's sending timestamp, independently of AI or reminder wording. The original Email Subject remains unchanged.
 
 If an AI request fails, the page shows the error (including authentication, balance, endpoint/model, rate-limit or network errors) and asks for confirmation before using any fallback. **Cancel stops the batch without downloading an Excel file.** Confirm allows quoted original excerpts for affected entries for this batch; a separate report identifies them. A returned issue excerpt that cannot be verified against the source also requires approval before a local excerpt is substituted. An unreachable endpoint may indicate a network restriction or a provider that does not permit direct browser requests (CORS).
 
@@ -59,7 +59,7 @@ If an AI request fails, the page shows the error (including authentication, bala
 | Status | Open |
 | Priority | Urgent for high importance or explicit urgency in the current subject/body; negated urgency and quoted history alone do not qualify |
 | Opening date | Blank |
-| Last remind Date | Most recent explicit reminder date; ambiguous numeric dates are left blank in offline mode |
+| Last remind Date | Corresponding email's sending date in Paris time, displayed as DD/MM/YYYY; blank if the sending timestamp is unavailable. Multi-file mode uses each uploaded email's date; nested mode uses each expanded email's date |
 | Last update | Blank |
 
 Unsupported mail attachments such as `.eml` files are reported separately. Embedded `.msg` attachments are processed recursively.

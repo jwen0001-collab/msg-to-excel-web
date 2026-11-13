@@ -274,6 +274,6 @@ export function localRow(mail, limits = {}) {
   row.requestor = FORWARD_RE.test(mail.subject) ? '' : mail.sender;
   row.followUpBy = followUpPeople(content);
   row.urgent = isUrgent(mail, content);
-  row.lastRemind = lastRemindDate(mail, segs);
+  row.lastRemind = mail.sent ? isoDate(mail.sent) : null;
   return row;
 }

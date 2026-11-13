@@ -175,8 +175,24 @@ test('latest reminder in french history', () => {
   assert.deepEqual(segs.slice(1).map(s => s.sent), ['2026-09-05', '2026-09-01']);
 });
 
-test('no reminder means blank, not latest sent date', () => {
-  assert.equal(m.localRow(mail('Question', 'Nous vous rappelons que le dossier est requis.')).lastRemind, null);
+test('last remind date uses the mail sent date even without a reminder', () => {
+  assert.equal(m.localRow(mail('Question', 'The file is required.')).lastRemind, '2026-09-15');
+});
+
+test('last remind date is the source sent date in both offline and AI workbooks', async () => {
+  const text = 'Please fix the TLM breaks on the NAV recon. Gentle reminder.';
+  const mm = mail('NAV', text, { sent: new Date('2026-09-14T22:30:00Z') });
+  const { c } = client([reply({ ...GOOD, last_remind: { date: '01/10/2026', evidence: 'Gentle reminder.' } })]);
+  for (const llm of [null, c]) {
+    const { ws } = await build([mm], { llm });
+    assert.equal(records(ws)[0]['Last remind Date'], '2026-09-15');
+    assert.equal(ws.getCell('J2').numFmt, 'DD/MM/YYYY');
+  }
+});
+
+test('missing sent date stays blank even when quoted history has dated reminders', () => {
+  const mm = mail('NAV', QUOTED_FR, { sent: null });
+  assert.equal(m.localRow(mm).lastRemind, null);
 });
 
 test('numeric quoted date is left blank', () => {

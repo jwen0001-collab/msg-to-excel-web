@@ -34,8 +34,7 @@ Return ONLY a JSON object with exactly these keys:
   "issue_excerpt_id": 1,
   "requestor": {"name": string or null, "evidence": string or null},
   "follow_up_by": [{"name": string, "evidence": string}],
-  "urgent": {"value": true or false, "evidence": string or null},
-  "last_remind": {"date": "DD/MM/YYYY" or null, "evidence": string or null}
+  "urgent": {"value": true or false, "evidence": string or null}
 }
 Rules:
 - summary: exactly ONE concise English sentence summarizing the main topic and what needs following up. Do not copy the subject or opening greeting; use the underlying request for a bare forward or reminder.
@@ -43,7 +42,7 @@ Rules:
 - requestor: the person who makes the request in this e-mail (not merely whoever forwarded it). null if unsure.
 - follow_up_by: ONLY people the e-mail explicitly names as the contact / the one to follow up. Never infer from To/Cc. [] if none.
 - urgent: true only if the CURRENT message (not quoted history) explicitly says it is urgent, or Importance is High. "not urgent" / "pas urgent" is false.
-- last_remind: date of the most recent explicit reminder/chaser (the current message or a quoted one), not simply the latest sent date. null if none.
+- Last remind Date is filled by the application from this email's sending timestamp. Do not infer a reminder date or include it in the response.
 - Every "evidence" must be an exact short quote copied from the e-mail text. If you cannot quote evidence, use null / [] / false.
 - Do not invent owners, deadlines or categories.
 - summary: write in plain, natural English with direct verbs. Avoid stock introductions such as "This email discusses", filler, labels, or any reference to AI. The issue excerpt retains its original wording and language. Return only the requested field contents in the JSON object.`;
@@ -94,7 +93,7 @@ export function applyReply(data, base, source, current, highImportance, today, c
   const candidate = indexed ? selected?.text ?? null : matchOriginal(source, data.issues_description);
   const originalExcerpt = candidate !== null || (indexed && data.issue_excerpt_id === null && !candidates.length);
   const row = { ...base, excerpts: false, issueExcerpt: true, summary: data.summary.trim(), issues: originalExcerpt ? compactIssue(candidate || '') : compactIssue(base.issues, 1),
-    requestor: '', followUpBy: [], urgent: false, lastRemind: null, notes: [] };
+    requestor: '', followUpBy: [], urgent: false, lastRemind: base.lastRemind, notes: [] };
   row.issueFallback = !originalExcerpt;
   if (!originalExcerpt) row.notes.push('Issue excerpt was not found verbatim in the source; a local original excerpt was used.');
 
@@ -112,18 +111,6 @@ export function applyReply(data, base, source, current, highImportance, today, c
   // same rule as local mode: wording only in quoted history does not make the current item urgent
   row.urgent = typeof urg === 'object' && urg.value === true && (highImportance || contains(current, urg.evidence));
 
-  const rem = data.last_remind || {};
-  if (typeof rem === 'object' && typeof rem.date === 'string' && grounded(rem.evidence)) {
-    const m = rem.date.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    if (m) {
-      const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
-      const t = new Date(Date.UTC(y, mo - 1, d));
-      if (t.getUTCFullYear() === y && t.getUTCMonth() === mo - 1 && t.getUTCDate() === d) {
-        const iso = `${m[3]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        row.lastRemind = iso <= today ? iso : null;
-      }
-    }
-  }
   return row;
 }
 
